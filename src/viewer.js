@@ -319,7 +319,7 @@ $.Viewer = function( options ) {
 
     this.bindStandardControls();
 
-    THIS[ this.hash ].prevContainerSize = _getSafeElemSize( this.container );
+    THIS[ this.hash ].prevContainerSize = _getSafeElemSize( this.container, 0 );
 
     // Create the world
     this.world = new $.World({
@@ -2260,17 +2260,35 @@ $.extend( $.Viewer.prototype, $.EventSource.prototype, $.ControlDock.prototype, 
 
 /**
  * _getSafeElemSize is like getElementSize(), but refuses to return 0 for x or y,
- * which was causing some calling operations to return NaN.
+ * which was causing some calling operations to return NaN. Function will recalculate
+ * element's size in [ms] interval.
  * @returns {Point}
  * @private
  */
-function _getSafeElemSize (oElement) {
-    oElement = $.getElement( oElement );
+function _getSafeElemSize (oElement, interval) {
+    if(oElement.oldClientWidth !== undefined && oElement.oldClientHeight !== undefined){
+        var safeSize = new $.Point(oElement.oldClientWidth, oElement.oldClientHeight);
 
-    return new $.Point(
-        (oElement.clientWidth === 0 ? 1 : oElement.clientWidth),
-        (oElement.clientHeight === 0 ? 1 : oElement.clientHeight)
-    );
+        var currentTime = new Date().getTime();
+        if(currentTime - oElement.recentCalculationTime > interval){
+            delete oElement.oldClientWidth;
+            delete oElement.oldClientHeight;
+        }
+
+        return safeSize;
+    } else {
+        var joElement = $.getElement( oElement );
+
+        var clientWidth = joElement.clientWidth === 0 ? 1 : joElement.clientWidth;
+        var clientHeight = joElement.clientHeight === 0 ? 1 : joElement.clientHeight;
+
+        var recentTime = new Date().getTime();
+        oElement.recentCalculationTime = recentTime;
+        oElement.oldClientWidth = clientWidth;
+        oElement.oldClientHeight = clientHeight;
+
+        return new $.Point(clientWidth, clientHeight);
+    }
 }
 
 
@@ -3286,7 +3304,7 @@ function updateOnce( viewer ) {
     }
 
     if (viewer.autoResize) {
-        var containerSize = _getSafeElemSize(viewer.container);
+        var containerSize = _getSafeElemSize(viewer.container, viewer.autoResizeInterval);
         var prevContainerSize = THIS[viewer.hash].prevContainerSize;
         if (!containerSize.equals(prevContainerSize)) {
             var viewport = viewer.viewport;
